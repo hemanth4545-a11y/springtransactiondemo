@@ -10,13 +10,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/baseController")
+@RequestMapping("/base")
 public class PaymentController {
 
     @Autowired
     private PaymentService paymentService;
 
-    @PostMapping("/Payment")
+    @PostMapping("/payment")
     public PaymentAcknowldgement doPayment(@RequestBody PaymentRequest paymentRequest){
         return paymentService.getPaymentStatus(paymentRequest);
     }
