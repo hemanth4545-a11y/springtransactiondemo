@@ -7,12 +7,16 @@ import com.example.springtransactiondemo.entity.PaymentInfo;
 import com.example.springtransactiondemo.repository.CustomerInfoRepository;
 import com.example.springtransactiondemo.repository.PaymentInfoRepository;
 import com.example.springtransactiondemo.util.PaymentUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jms.core.JmsMessagingTemplate;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import javax.jms.TextMessage;
 
 @Service
 public class PaymentService {
@@ -43,9 +47,21 @@ public class PaymentService {
        return paymentAcknowldgement;
    }
 
-    public void sendMessage(PaymentAcknowldgement paymentAcknowldgement) {
+    public void sendMessage(PaymentAcknowldgement paymentAcknowldgement)  {
         try{
-            jmsTemplate.convertAndSend(paymentSuccessQueue, paymentAcknowldgement);
+         //   jmsTemplate.convertAndSend(paymentSuccessQueue, paymentAcknowldgement);
+            jmsTemplate.send(paymentSuccessQueue, s -> {
+                    ObjectMapper objectMapper = new ObjectMapper();
+                String s1= null;
+                TextMessage textMessage = null;
+                try {
+                    s1 = objectMapper.writeValueAsString(paymentAcknowldgement);
+                    textMessage = s.createTextMessage(s1);
+                } catch (JsonProcessingException e) {
+                    e.printStackTrace();
+                }
+                    return textMessage;
+            });
         }catch (Exception ex){
             ex.printStackTrace();
         }
