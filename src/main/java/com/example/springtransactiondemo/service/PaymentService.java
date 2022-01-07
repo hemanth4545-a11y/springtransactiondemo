@@ -4,6 +4,7 @@ import com.example.springtransactiondemo.dto.PaymentAcknowldgement;
 import com.example.springtransactiondemo.dto.PaymentRequest;
 import com.example.springtransactiondemo.entity.CustomerInfo;
 import com.example.springtransactiondemo.entity.PaymentInfo;
+import com.example.springtransactiondemo.exception.InsufficientAmountException;
 import com.example.springtransactiondemo.repository.CustomerInfoRepository;
 import com.example.springtransactiondemo.repository.PaymentInfoRepository;
 import com.example.springtransactiondemo.util.PaymentUtils;
@@ -33,17 +34,40 @@ public class PaymentService {
     @Value("${response.payment.success.queue}")
     private String paymentSuccessQueue;
 
-    @Transactional
+    @Value("${request.payment.json.queue}")
+    private String paymentrequestQueue;
+
+    @Transactional(rollbackFor = InsufficientAmountException.class)
    public PaymentAcknowldgement getPaymentStatus(PaymentRequest paymentRequest){
-       CustomerInfo customerInfo = paymentRequest.getCustomerInfo();
-       customerInfoRepository.save(customerInfo);
-       PaymentInfo paymentInfo = paymentRequest.getPaymentInfo();
-       PaymentUtils.validatePaymentLimit(customerInfo.getAccountNO(),paymentInfo.getAmount());
-       paymentInfo.setCustomerId(customerInfo.getCustomerId());
-       paymentInfoRepository.save(paymentInfo);
-       PaymentAcknowldgement paymentAcknowldgement = new PaymentAcknowldgement();
-       paymentAcknowldgement.setTransactionId(paymentInfo.getPaymentId());
-       paymentAcknowldgement.setMessage("success");
+        PaymentAcknowldgement paymentAcknowldgement = new PaymentAcknowldgement();
+        Long customerId = null;
+          try {
+              CustomerInfo customerInfo = paymentRequest.getCustomerInfo();
+              customerInfoRepository.save(customerInfo);
+              customerId = customerInfo.getCustomerId();
+              PaymentInfo paymentInfo = paymentRequest.getPaymentInfo();
+              PaymentUtils.validatePaymentLimit(customerInfo.getAccountNO(), paymentInfo.getAmount());
+              paymentInfo.setCustomerId(customerInfo.getCustomerId());
+              paymentInfoRepository.save(paymentInfo);
+              paymentAcknowldgement.setTransactionId(paymentInfo.getPaymentId());
+              paymentAcknowldgement.setMessage("success");
+          }catch (InsufficientAmountException insufficientAmountException){
+             CustomerInfo customerInfo = customerInfoRepository.getById(customerId);
+             System.out.println(customerInfo.getCustomerName());
+              jmsTemplate.send(paymentrequestQueue, s -> {
+                  ObjectMapper objectMapper = new ObjectMapper();
+                  String s1= null;
+                  TextMessage textMessage = null;
+                  try {
+                      s1 = objectMapper.writeValueAsString(paymentAcknowldgement);
+                      textMessage = s.createTextMessage(s1);
+                  } catch (JsonProcessingException e) {
+                      e.printStackTrace();
+                  }
+                  return textMessage;
+              });
+          }
+
        return paymentAcknowldgement;
    }
 
